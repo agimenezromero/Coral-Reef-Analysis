@@ -4,7 +4,7 @@ import os
 
 from shapely.strtree import STRtree
 
-def harmonize_data(input_folder, output_folder)
+def harmonize_data(input_folder, output_folder):
 
     os.chdir(data_folder)
 
@@ -47,27 +47,27 @@ def harmonize_data(input_folder, output_folder)
 
         print("done!")
         
-def combine_polygons(input_folder, output_folder):
+def combine_polygons(input_folder, output_folder, class_save="Coral/Algae"):
+
+    if not os.path.exists(output_folder): 
+        
+        os.mkdir(output_folder)
     
     names = os.listdir(input_folder)[-12:]
-
-    #class_save = "Sand"
 
     for name in names:
 
         print("Computing %s..." % name)
 
-        #data = gpd.read_file("/data/bio/corals/Processed_CoralAtlas_data/All/%s" % name, driver="GeoJSON")
-        #gdf = data[data["class"] == class_save]
-        gdf = gpd.read_file("%s/%s" % (input_folder, name), driver="GeoJSON")
+        data = gpd.read_file("%s/%s" % (input_folder, name), driver="GeoJSON")
+        
+        gdf = data[data["class"] == class_save]
 
         N_gdf = len(gdf)
 
-        geometries = gdf["geometry"]
+        tree = STRtree(gdf["geometry"])
 
-        tree = STRtree(geometries)
-
-        index_by_id = dict((id(pt), i) for i, pt in enumerate(geometries))
+        #index_by_id = dict((id(pt), i) for i, pt in enumerate(geometries)) -> This was needed with an older version of STRtree
 
         labels = np.arange(0, N_gdf, 1)
 
@@ -75,7 +75,7 @@ def combine_polygons(input_folder, output_folder):
 
         for i in range(len(gdf)):
 
-            intersections = tree.query(gdf["geometry"][i])
+            intersections = tree.query(gdf["geometry"].iloc[i])
 
             idx_intersect = []
 
@@ -83,14 +83,14 @@ def combine_polygons(input_folder, output_folder):
 
                 for item in intersections:
 
-                    if gdf["geometry"][i] == item:
+                    if item == i: #gdf["geometry"][i] == item: -> This was needed with an older version of STRtree
 
                         pass
 
-                    elif gdf["geometry"][i].intersects(item):
+                    elif gdf["geometry"].iloc[i].intersects(gdf["geometry"].iloc[item]): #gdf["geometry"][i].intersects(item): -> This was needed with an older version of STRtree
 
-                        #Index that intersect with polygon i
-                        idx_intersect.append(index_by_id[id(item)])
+                        #Index that intersect with polygon i                      
+                        idx_intersect.append(item) #idx_intersect.append(index_by_id[id(item)]) -> This was needed with an older version of STRtree
 
             #Labels of the clusters that intersect cluster i
             labels_idx_intersect = labels[idx_intersect]
@@ -108,5 +108,5 @@ def combine_polygons(input_folder, output_folder):
 
         combined_polygons = gdf.dissolve(by=labels, aggfunc="sum")
 
-        combined_polygons.to_file("%s/combined_polygons_%s" % (outout_folder, name), driver="GeoJSON")
+        combined_polygons.to_file("%s/combined_polygons_%s" % (output_folder, name), driver="GeoJSON")
 
